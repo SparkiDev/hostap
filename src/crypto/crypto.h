@@ -529,6 +529,14 @@ int crypto_bignum_to_bin(const struct crypto_bignum *a,
 			 u8 *buf, size_t buflen, size_t padlen);
 
 /**
+ * crypto_bignum_rand - Create random number in range of modulus.
+ * @r: Bignum; random value
+ * @m: Bignum; Modulus
+ * Returns: 0 on success, -1 on failure
+ */
+int crypto_bignum_rand(struct crypto_bignum *r, const struct crypto_bignum *m);
+
+/**
  * crypto_bignum_add - c = a + b
  * @a: Bignum
  * @b: Bignum
@@ -610,6 +618,16 @@ int crypto_bignum_mulmod(const struct crypto_bignum *a,
 			 struct crypto_bignum *d);
 
 /**
+ * crypto_bugnum_rshift - r = a >> n
+ * @a: Bignum
+ * @n: Number of bits
+ * @r: Bignum; used to store thr result of a >> n
+ * Returns: 0 on success, -1 on failure
+ */
+int crypto_bugnum_rshift(const struct crypto_bignum *a, int n,
+                         struct crypto_bignum *r);
+
+/**
  * crypto_bignum_cmp - Compare two bignums
  * @a: Bignum
  * @b: Bignum
@@ -638,6 +656,13 @@ int crypto_bignum_is_zero(const struct crypto_bignum *a);
  * Returns: 1 if @a is one or 0 if not
  */
 int crypto_bignum_is_one(const struct crypto_bignum *a);
+
+/**
+ * crypto_bignum_is_odd - Is the given bignum odd
+ * @a: Bignum
+ * Returns: 1 if @a is odd or 0 if not
+ */
+int crypto_bignum_is_odd(const struct crypto_bignum *a);
 
 /**
  * crypto_bignum_legendre - Compute the Legendre symbol (a/p)
@@ -671,6 +696,14 @@ struct crypto_ec * crypto_ec_init(int group);
 void crypto_ec_deinit(struct crypto_ec *e);
 
 /**
+ * crypto_ec_cofactor - Set the cofactor into the big number.
+ * @e: EC context from crypto_ec_init()
+ * @cofactor: Cofactor of curve.
+ * Returns: 0 on success, -1 on failure
+ */
+int crypto_ec_cofactor(struct crypto_ec* e, struct crypto_bignum* cofactor);
+
+/**
  * crypto_ec_prime_len - Get length of the prime in octets
  * @e: EC context from crypto_ec_init()
  * Returns: Length of the prime defining the group
@@ -683,6 +716,13 @@ size_t crypto_ec_prime_len(struct crypto_ec *e);
  * Returns: Length of the prime defining the group in bits
  */
 size_t crypto_ec_prime_len_bits(struct crypto_ec *e);
+
+/**
+ * crypto_ec_order_len - Get length of the order in octets
+ * @e: EC context from crypto_ec_init()
+ * Returns: Length of the order defining the group
+ */
+size_t crypto_ec_order_len(struct crypto_ec *e);
 
 /**
  * crypto_ec_get_prime - Get prime defining an EC group
@@ -721,6 +761,14 @@ struct crypto_ec_point * crypto_ec_point_init(struct crypto_ec *e);
 void crypto_ec_point_deinit(struct crypto_ec_point *p, int clear);
 
 /**
+ * crypto_ec_point_x - Copies the x-ordinate point into big number
+ * @p: EC point data.
+ * @x; Big number copy of x-ordinate.
+ * Returns: 0 on success, -1 on failure
+ */
+int crypto_ec_point_x(const struct crypto_ec_point *p, struct crypto_bignum *x);
+
+/**
  * crypto_ec_point_to_bin - Write EC point value as binary data
  * @e: EC context from crypto_ec_init()
  * @p: EC point data from crypto_ec_point_init()
@@ -749,7 +797,7 @@ struct crypto_ec_point * crypto_ec_point_from_bin(struct crypto_ec *e,
 						  const u8 *val);
 
 /**
- * crypto_bignum_add - c = a + b
+ * crypto_ec_point_add - c = a + b
  * @e: EC context from crypto_ec_init()
  * @a: Bignum
  * @b: Bignum
@@ -761,7 +809,7 @@ int crypto_ec_point_add(struct crypto_ec *e, const struct crypto_ec_point *a,
 			struct crypto_ec_point *c);
 
 /**
- * crypto_bignum_mul - res = b * p
+ * crypto_ec_point_mul - res = b * p
  * @e: EC context from crypto_ec_init()
  * @p: EC point
  * @b: Bignum

@@ -624,6 +624,27 @@ CFLAGS += -DCONFIG_TLSV12
 NEED_SHA256=y
 endif
 
+ifeq ($(CONFIG_TLS), wolfssl)
+CFLAGS += -DCRYPTO_ABSTRACT_API
+ifdef TLS_FUNCS
+OBJS += ../src/crypto/tls_wolfssl.o
+LIBS += -lwolfssl -lm
+endif
+OBJS += ../src/crypto/crypto_wolfssl.o
+HOBJS += ../src/crypto/crypto_wolfssl.o
+ifdef NEED_FIPS186_2_PRF
+OBJS += ../src/crypto/fips_prf_wolfssl.o
+endif
+NEED_SHA256=y
+NEED_TLS_PRF_SHA256=y
+LIBS += -lwolfssl -lm
+LIBS_h += -lwolfssl -lm
+ifdef CONFIG_TLS_ADD_DL
+LIBS += -ldl
+LIBS_h += -ldl
+endif
+endif
+
 ifeq ($(CONFIG_TLS), openssl)
 ifdef TLS_FUNCS
 OBJS += ../src/crypto/tls_openssl.o
@@ -813,7 +834,9 @@ AESOBJS += ../src/crypto/aes-internal.o ../src/crypto/aes-internal-enc.o
 endif
 
 ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), wolfssl)
 AESOBJS += ../src/crypto/aes-wrap.o
+endif
 endif
 ifdef NEED_AES_EAX
 AESOBJS += ../src/crypto/aes-eax.o
@@ -839,8 +862,10 @@ endif
 ifdef NEED_AES_UNWRAP
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
+ifneq ($(CONFIG_TLS), wolfssl)
 NEED_AES_DEC=y
 AESOBJS += ../src/crypto/aes-unwrap.o
+endif
 endif
 endif
 endif
@@ -848,7 +873,9 @@ ifdef NEED_AES_CBC
 NEED_AES_DEC=y
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
+ifneq ($(CONFIG_TLS), wolfssl)
 AESOBJS += ../src/crypto/aes-cbc.o
+endif
 endif
 endif
 endif
@@ -864,7 +891,9 @@ endif
 ifdef NEED_SHA1
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
+ifneq ($(CONFIG_TLS), wolfssl)
 SHA1OBJS += ../src/crypto/sha1.o
+endif
 endif
 endif
 SHA1OBJS += ../src/crypto/sha1-prf.o
@@ -875,7 +904,9 @@ SHA1OBJS += ../src/crypto/fips_prf_internal.o
 endif
 endif
 ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), wolfssl)
 SHA1OBJS += ../src/crypto/sha1-pbkdf2.o
+endif
 endif
 ifdef NEED_T_PRF
 SHA1OBJS += ../src/crypto/sha1-tprf.o
@@ -891,7 +922,9 @@ endif
 
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
+ifneq ($(CONFIG_TLS), wolfssl)
 OBJS += ../src/crypto/md5.o
+endif
 endif
 endif
 
@@ -930,7 +963,9 @@ ifdef NEED_SHA256
 CFLAGS += -DCONFIG_SHA256
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
+ifneq ($(CONFIG_TLS), wolfssl)
 OBJS += ../src/crypto/sha256.o
+endif
 endif
 endif
 OBJS += ../src/crypto/sha256-prf.o
@@ -989,7 +1024,9 @@ HOBJS += ../src/utils/eloop.o
 HOBJS += $(SHA1OBJS)
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
+ifneq ($(CONFIG_TLS), wolfssl)
 HOBJS += ../src/crypto/md5.o
+endif
 endif
 endif
 endif
@@ -1174,7 +1211,13 @@ endif
 ifdef CONFIG_INTERNAL_MD5
 NOBJS += ../src/crypto/md5-internal.o
 endif
-NOBJS += ../src/crypto/crypto_openssl.o ../src/utils/os_$(CONFIG_OS).o
+ifneq ($(CONFIG_TLS), openssl)
+NOBJS += ../src/crypto/crypto_openssl.o
+endif
+ifneq ($(CONFIG_TLS), wolfssl)
+NOBJS += ../src/crypto/crypto_wolfssl.o
+endif
+NOBJS += ../src/utils/os_$(CONFIG_OS).o
 NOBJS += ../src/utils/wpa_debug.o
 NOBJS += ../src/utils/wpabuf.o
 ifdef CONFIG_WPA_TRACE
