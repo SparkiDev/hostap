@@ -284,8 +284,7 @@ static void eap_pwd_build_commit_req(struct eap_sm *sm,
 		goto fin;
 	}
 
-	if (crypto_ec_point_invert(data->grp->group, data->my_element) != 0)
-	{
+	if (crypto_ec_point_invert(data->grp->group, data->my_element) != 0) {
 		wpa_printf(MSG_INFO, "EAP-PWD (server): element inversion "
 			   "fail");
 		goto fin;
@@ -945,7 +944,7 @@ eap_pwd_process_commit_resp(struct eap_sm *sm, struct eap_pwd_data *data,
 	/* check to ensure peer's element is not in a small sub-group */
 	if (!crypto_bignum_is_one(cofactor)) {
 		if (crypto_ec_point_mul(data->grp->group, data->peer_element,
-					 cofactor, point) != 0) {
+					cofactor, point) != 0) {
 			wpa_printf(MSG_INFO, "EAP-PWD (server): cannot "
 				   "multiply peer element by order");
 			goto fin;

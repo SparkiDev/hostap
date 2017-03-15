@@ -324,6 +324,7 @@ struct tls_connection* tls_connection_init(void *tls_ctx)
      * ID in EAP method in EAP methodss.
      */
     wolfSSL_KeepArrays(conn->ssl);
+    wolfSSL_KeepResources(conn->ssl);
 
     return conn;
 }
@@ -415,6 +416,8 @@ static int tls_connection_dh(struct tls_connection* conn, const char* dh_file,
 {
     if (dh_file == NULL && dh_blob == NULL)
         return 0;
+
+    wolfSSL_set_accept_state(conn->ssl);
 
     if (dh_blob) {
         if (wolfSSL_SetTmpDH_buffer(conn->ssl, dh_blob, blob_len,

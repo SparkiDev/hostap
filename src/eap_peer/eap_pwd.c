@@ -466,8 +466,7 @@ eap_pwd_perform_commit_exchange(struct eap_sm *sm, struct eap_pwd_data *data,
 		goto fin;
 	}
 
-	if (crypto_ec_point_invert(data->grp->group, data->my_element) != 0)
-	{
+	if (crypto_ec_point_invert(data->grp->group, data->my_element) != 0) {
 		wpa_printf(MSG_INFO, "EAP-PWD (peer): element inversion fail");
 		goto fin;
 	}
