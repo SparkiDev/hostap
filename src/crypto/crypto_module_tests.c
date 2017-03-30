@@ -1077,6 +1077,7 @@ struct passphrase_test {
 
 static const struct passphrase_test passphrase_tests[] =
 {
+#ifndef CONFIG_FIPS
 	{
 		"password",
 		"IEEE",
@@ -1087,6 +1088,7 @@ static const struct passphrase_test passphrase_tests[] =
 			0x3a, 0xed, 0x76, 0x2e, 0x97, 0x10, 0xa1, 0x2e
 		}
 	},
+#endif
 	{
 		"ThisIsAPassword",
 		"ThisIsASSID",
@@ -1122,6 +1124,7 @@ struct rfc6070_test {
 
 static const struct rfc6070_test rfc6070_tests[] =
 {
+#ifndef CONFIG_FIPS
 	{
 		"password",
 		"salt",
@@ -1155,6 +1158,7 @@ static const struct rfc6070_test rfc6070_tests[] =
 		},
 		20
 	},
+#endif
 #if 0 /* This takes quite long to derive.. */
 	{
 		"password",
@@ -1214,6 +1218,7 @@ static int test_sha1(void)
 		ret++;
 	}
 
+#ifndef CONFIG_FIPS
 	if (sha1_prf(key1, sizeof(key1) - 1, "prefix", data1, sizeof(data1) - 1,
 		     res, sizeof(prf1)) == 0 &&
 	    os_memcmp(res, prf1, sizeof(prf1)) == 0)
@@ -1222,6 +1227,7 @@ static int test_sha1(void)
 		wpa_printf(MSG_INFO, "Test case 1 - FAILED!");
 		ret++;
 	}
+#endif
 
 	if (sha1_prf(key2, sizeof(key2), "prefix", data2, sizeof(data2),
 		     res, sizeof(prf2)) == 0 &&
@@ -1400,6 +1406,7 @@ static const struct hmac_test {
 			0x4a, 0xf1, 0x52, 0xe8, 0xb2, 0xfa, 0x9c, 0xb6
 		}
 	},
+#ifndef CONFIG_FIPS
 	{ /* RFC 4231 - Test Case 2 */
 		"Jefe",
 		4,
@@ -1420,6 +1427,7 @@ static const struct hmac_test {
 			0x8b, 0x32, 0x39, 0xec, 0xfa, 0xb2, 0x16, 0x49
 		}
 	},
+#endif
 	{
 		{
 			0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
@@ -1767,16 +1775,26 @@ static int test_sha256(void)
 #ifdef CONFIG_HMAC_SHA256_KDF
 		int res;
 
+#ifndef CONFIG_FIPS
 		res = hmac_sha256_kdf((u8 *) "secret", 6, "label",
 				      (u8 *) "seed", 4, key, 8160);
+#else
+		res = hmac_sha256_kdf((u8 *) "secret0123456789", 16, "label",
+				      (u8 *) "seed", 4, key, 8160);
+#endif
 		if (res) {
 			wpa_printf(MSG_INFO,
 				   "Unexpected hmac_sha256_kdf(outlen=8160) failure");
 			errors++;
 		}
 
+#ifndef CONFIG_FIPS
 		res = hmac_sha256_kdf((u8 *) "secret", 6, "label",
 				      (u8 *) "seed", 4, key, 8161);
+#else
+		res = hmac_sha256_kdf((u8 *) "secret0123456789", 16, "label",
+				      (u8 *) "seed", 4, key, 8161);
+#endif
 		if (res == 0) {
 			wpa_printf(MSG_INFO,
 				   "Unexpected hmac_sha256_kdf(outlen=8161) success");
@@ -1918,6 +1936,7 @@ static int test_extract_expand_hkdf(void)
 	u8 okm[82];
 
 	/* RFC 5869, A.1 */
+#ifndef CONFIG_FIPS
 	u8 ikm1[22] = {
 		0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b,
 		0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b,
@@ -1927,6 +1946,7 @@ static int test_extract_expand_hkdf(void)
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 		0x08, 0x09, 0x0a, 0x0b, 0x0c
 	};
+#endif
 	u8 info1[10] = {
 		0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
 		0xf8, 0xf9
@@ -2005,6 +2025,7 @@ static int test_extract_expand_hkdf(void)
 
 	wpa_printf(MSG_INFO, "Testing Extract-and-Expand HKDF (RFC 5869)");
 
+#ifndef CONFIG_FIPS
 	wpa_printf(MSG_INFO, "RFC 5869 - Test Case 1");
 	if (hmac_sha256(salt1, sizeof(salt1), ikm1, sizeof(ikm1), prk) < 0)
 		return -1;
@@ -2012,6 +2033,7 @@ static int test_extract_expand_hkdf(void)
 		wpa_printf(MSG_INFO, "HKDF-Extract mismatch in PRK");
 		return -1;
 	}
+#endif
 	if (hmac_sha256_kdf(prk1, sizeof(prk1), NULL, info1, sizeof(info1),
 			    okm, sizeof(okm1)) < 0)
 		return -1;

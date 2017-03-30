@@ -693,6 +693,9 @@ endif
 
 ifdef CONFIG_EAP_PWD
 CFLAGS += -DEAP_PWD
+ifeq ($(CONFIG_TLS), wolfssl)
+CFLAGS += -DCONFIG_ECC
+endif
 OBJS += ../src/eap_peer/eap_pwd.o ../src/eap_common/eap_pwd_common.o
 CONFIG_IEEE8021X_EAPOL=y
 NEED_SHA256=y
@@ -1302,6 +1305,15 @@ AESOBJS += ../src/crypto/aes-omac1.o
 endif
 endif
 endif
+ifdef CONFIG_WOLFSSL_CMAC
+CFLAGS += -DCONFIG_WOLFSSL_CMAC
+else
+ifneq ($(CONFIG_TLS), linux)
+ifneq ($(CONFIG_TLS), wolfssl)
+AESOBJS += ../src/crypto/aes-omac1.o
+endif
+endif
+endif
 endif
 ifdef NEED_AES_WRAP
 NEED_AES_ENC=y
@@ -1386,6 +1398,9 @@ endif
 
 DESOBJS = # none needed when not internal
 ifdef NEED_DES
+ifndef CONFIG_FIPS
+CFLAGS += -DCONFIG_DES
+endif
 ifdef CONFIG_INTERNAL_DES
 DESOBJS += ../src/crypto/des-internal.o
 endif
@@ -1437,7 +1452,9 @@ endif
 ifdef NEED_SHA384
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
+ifneq ($(CONFIG_TLS), wolfssl)
 OBJS += ../src/crypto/sha384.o
+endif
 endif
 endif
 CFLAGS += -DCONFIG_SHA384

@@ -18,13 +18,14 @@
 #include "crypto.h"
 
 #define WOLFSSL_AES_DIRECT
+#define HAVE_AESGCM
 #define HAVE_AES_KEYWRAP
+#define WOLFSSL_SHA384
 #define WOLFSSL_SHA512
 #define WOLFSSL_CMAC
 #define HAVE_ECC
 #define USE_FAST_MATH
 #define WOLFSSL_KEY_GEN
-
 
 #include <wolfssl/options.h>
 /* wolfSSL headers */
@@ -32,6 +33,7 @@
 #include <wolfssl/wolfcrypt/md5.h>
 #include <wolfssl/wolfcrypt/sha.h>
 #include <wolfssl/wolfcrypt/sha256.h>
+#include <wolfssl/wolfcrypt/sha512.h>
 #include <wolfssl/wolfcrypt/hmac.h>
 #include <wolfssl/wolfcrypt/pwdbased.h>
 #include <wolfssl/wolfcrypt/arc4.h>
@@ -41,7 +43,6 @@
 #include <wolfssl/wolfcrypt/cmac.h>
 #include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/openssl/bn.h>
-
 
 #ifndef CONFIG_FIPS
 int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
@@ -61,9 +62,7 @@ int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 
     return 0;
 }
-#endif
 
-#ifndef CONFIG_FIPS
 int md5_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 {
     Md5    md5;
@@ -123,6 +122,27 @@ int sha256_vector(size_t num_elem, const u8 *addr[], const size_t *len,
 }
 #endif /* NO_SHA256_WRAPPER */
 
+#ifdef CONFIG_SHA384
+int sha384_vector(size_t num_elem, const u8 *addr[], const size_t *len,
+          u8 *mac)
+{
+    Sha384 sha384;
+    size_t i;
+
+    if (TEST_FAIL())
+        return -1;
+
+    wc_InitSha384(&sha384);
+
+    for (i = 0; i < num_elem; i++)
+        wc_Sha384Update(&sha384, addr[i], len[i]);
+
+    wc_Sha384Final(&sha384, mac);
+
+    return 0;
+}
+#endif /* CONFIG_SHA384 */
+
 static int wolfssl_hmac_vector(int type, const u8 *key,
                                size_t key_len, size_t num_elem,
                                const u8 *addr[], const size_t *len, u8 *mac,
@@ -147,7 +167,6 @@ static int wolfssl_hmac_vector(int type, const u8 *key,
 }
 
 #ifndef CONFIG_FIPS
-
 int hmac_md5_vector(const u8 *key, size_t key_len, size_t num_elem,
                     const u8 *addr[], const size_t *len, u8 *mac)
 {
@@ -160,8 +179,7 @@ int hmac_md5(const u8 *key, size_t key_len, const u8 *data, size_t data_len,
 {
     return hmac_md5_vector(key, key_len, 1, &data, &data_len, mac);
 }
-
-#endif /* CONFIG_FIPS */
+#endif
 
 int hmac_sha1_vector(const u8 *key, size_t key_len, size_t num_elem,
                      const u8 *addr[], const size_t *len, u8 *mac)
@@ -224,7 +242,8 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len,
 }
 
 
-void des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
+#ifdef CONFIG_DES
+int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 {
     Des des;
     u8  pkey[8], next, tmp;
@@ -241,8 +260,10 @@ void des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 
     wc_Des_SetKey(&des, pkey, NULL, DES_ENCRYPTION);
     wc_Des_EcbEncrypt(&des, cypher, clear, DES_BLOCK_SIZE);
-}
 
+    return 0;
+}
+#endif
 
 void * aes_encrypt_init(const u8 *key, size_t len)
 {
@@ -263,9 +284,10 @@ void * aes_encrypt_init(const u8 *key, size_t len)
     return aes;
 }
 
-void aes_encrypt(void *ctx, const u8 *plain, u8 *crypt)
+int aes_encrypt(void *ctx, const u8 *plain, u8 *crypt)
 {
     wc_AesEncryptDirect((Aes*)ctx, crypt, plain);
+    return 0;
 }
 
 
@@ -296,9 +318,10 @@ void* aes_decrypt_init(const u8 *key, size_t len)
 }
 
 
-void aes_decrypt(void *ctx, const u8 *crypt, u8 *plain)
+int aes_decrypt(void *ctx, const u8 *crypt, u8 *plain)
 {
     wc_AesDecryptDirect((Aes*)ctx, plain, crypt);
+    return 0;
 }
 
 
@@ -394,6 +417,7 @@ int rc4_skip(const u8 *key, size_t keylen, size_t skip, u8 *data,
 }
 #endif /* CONFIG_NO_RC4 */
 
+#ifndef CRYPTO_ABSTRACT_API
 #if defined(EAP_WSC) || defined(EAP_IKEV2) || defined(EAP_IKEV2_DYNAMIC) \
                      || defined(EAP_EKE) || defined(EAP_EKE_DYNAMIC) \
                      || defined(CONFIG_SAE)
@@ -465,6 +489,7 @@ done:
     wolfSSL_BN_free(a);
     return ret;
 }
+#endif
 #endif
 #endif
 
@@ -767,6 +792,83 @@ void dh5_free(void *ctx)
 }
 #endif
 
+#ifdef CRYPTO_ABSTRACT_API
+int crypto_dh_init(u8 generator, const u8 *prime, size_t prime_len, u8 *privkey,
+                   u8 *pubkey)
+{
+    int ret = -1;
+    WC_RNG rng;
+    DhKey* dh = NULL;
+    word32 privSz, pubSz;
+
+    if (TEST_FAIL())
+        return -1;
+
+    dh = os_malloc(sizeof(DhKey));
+    if (dh == NULL)
+        return -1;
+    wc_InitDhKey(dh);
+
+    if (wc_InitRng(&rng) != 0) {
+        os_free(dh);
+        return -1;
+    }
+
+    if (wc_DhSetKey(dh, prime, prime_len, &generator, 1) != 0)
+        goto done;
+
+    if (wc_DhGenerateKeyPair(dh, &rng, privkey, &privSz, pubkey, &pubSz) != 0)
+        goto done;
+
+    if (privSz < prime_len) {
+        size_t padSz = prime_len - privSz;
+        os_memmove(privkey + padSz, privkey, privSz);
+        os_memset(privkey, 0, padSz);
+    }
+
+    if (pubSz < prime_len) {
+        size_t padSz = prime_len - pubSz;
+        os_memmove(pubkey + padSz, pubkey, pubSz);
+        os_memset(pubkey, 0, padSz);
+    }
+    ret = 0;
+done:
+    wc_FreeDhKey(dh);
+    os_free(dh);
+    wc_FreeRng(&rng);
+    return ret;
+}
+
+int crypto_dh_derive_secret(u8 generator, const u8 *prime, size_t prime_len,
+                            const u8 *privkey, size_t privkey_len,
+                            const u8 *pubkey, size_t pubkey_len,
+                            u8 *secret, size_t *len)
+{
+    int ret = -1;
+    DhKey* dh;
+    word32 secretSz;
+
+    dh = os_malloc(sizeof(DhKey));
+    if (dh == NULL)
+        return -1;
+    wc_InitDhKey(dh);
+
+    if (wc_DhSetKey(dh, prime, prime_len, &generator, 1) != 0)
+        goto done;
+
+    if (wc_DhAgree(dh, secret, &secretSz, privkey, privkey_len, pubkey,
+                   pubkey_len) != 0)
+        goto done;
+
+    *len = secretSz;
+    ret = 0;
+done:
+    wc_FreeDhKey(dh);
+    os_free(dh);
+    return ret;
+}
+#endif /* CRYPTO_ABSTRACT_API */
+
 #ifdef CONFIG_FIPS
 int crypto_get_random(void *buf, size_t len)
 {
@@ -802,18 +904,21 @@ struct crypto_hash * crypto_hash_init(enum crypto_hash_alg alg, const u8 *key,
     switch (alg) {
 #ifndef NO_MD5
         case CRYPTO_HASH_ALG_HMAC_MD5:
+            hash->size = 16;
             type = MD5;
             break;
 #endif
 #ifndef NO_SHA
         case CRYPTO_HASH_ALG_HMAC_SHA1:
             type = SHA;
+            hash->size = 20;
             break;
 #endif
 #ifdef CONFIG_SHA256
 #ifndef NO_SHA256
         case CRYPTO_HASH_ALG_HMAC_SHA256:
             type = SHA256;
+            hash->size = 32;
             break;
 #endif
 #endif
@@ -824,7 +929,6 @@ struct crypto_hash * crypto_hash_init(enum crypto_hash_alg alg, const u8 *key,
     if (wc_HmacSetKey(&hash->hmac, type, key, key_len) != 0)
         goto done;
 
-    hash->size = wc_HmacSizeByType(type);
     ret = hash;
     hash = NULL;
 done:
@@ -1501,14 +1605,16 @@ int crypto_ec_point_solve_y_coord(struct crypto_ec *e,
 {
     byte buf[MAX_ECC_BYTES + 1];
     int ret;
+    int prime_len = crypto_ec_prime_len(e);
 
     if (TEST_FAIL())
         return -1;
 
     buf[0] = 0x2 + (byte)y_bit;
-    ret = crypto_bignum_to_bin(x, buf + 1, MAX_ECC_BYTES, MAX_ECC_BYTES);
-    if (ret <= 0)
+    ret = crypto_bignum_to_bin(x, buf + 1, prime_len, prime_len);
+    if (ret <= 0) {
         return -1;
+    }
     ret = wc_ecc_import_point_der(buf, ret + 1, e->key.idx, (ecc_point*)p);
     if (ret != 0)
         return -1;

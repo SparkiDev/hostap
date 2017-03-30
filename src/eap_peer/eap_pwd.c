@@ -818,8 +818,8 @@ eap_pwd_perform_confirm_exchange(struct eap_sm *sm, struct eap_pwd_data *data,
 	u32 cs;
 	u16 grp;
 	u8 conf[SHA256_MAC_LEN], *cruft = NULL, *ptr;
-	int prime_len = crypto_ec_prime_len(data->grp->group);
-	int order_len = crypto_ec_order_len(data->grp->group);
+	int prime_len = 0;
+	int order_len = 0;
 
 	if (data->state != PWD_Confirm_Req) {
 		ret->ignore = TRUE;
@@ -833,6 +833,9 @@ eap_pwd_perform_confirm_exchange(struct eap_sm *sm, struct eap_pwd_data *data,
 			   SHA256_MAC_LEN);
 		goto fin;
 	}
+
+        prime_len = crypto_ec_prime_len(data->grp->group);
+        order_len = crypto_ec_order_len(data->grp->group);
 
 	/*
 	 * first build up the ciphersuite which is group | random_function |
@@ -970,7 +973,7 @@ eap_pwd_perform_confirm_exchange(struct eap_sm *sm, struct eap_pwd_data *data,
 
 fin:
 	if (data->grp)
-		bin_clear_free(cruft, prime_len);
+		bin_clear_free(cruft, prime_len * 2);
 	if (data->outbuf == NULL) {
 		ret->methodState = METHOD_DONE;
 		ret->decision = DECISION_FAIL;

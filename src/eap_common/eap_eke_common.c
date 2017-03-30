@@ -155,7 +155,30 @@ static int eap_eke_auth_len(u8 prf)
 	return -1;
 }
 
+#ifdef CRYPTO_ABSTRACT_API
+int eap_eke_dh_init(u8 group, u8 *ret_priv, u8 *ret_pub)
+{
+	int generator;
+	u8 gen;
+	const struct dh_group *dh;
 
+	generator = eap_eke_dh_generator(group);
+	dh = eap_eke_dh_group(group);
+	if (generator < 0 || generator > 255 || !dh)
+		return -1;
+	gen = generator;
+
+        if (crypto_dh_init(gen, dh->prime, dh->prime_len, ret_priv,
+                           ret_pub) < 0)
+            return -1;
+	wpa_hexdump_key(MSG_DEBUG, "EAP-EKE: DH private value",
+			ret_priv, dh->prime_len);
+	wpa_hexdump(MSG_DEBUG, "EAP-EKE: DH public value",
+		    ret_pub, dh->prime_len);
+
+	return 0;
+}
+#else
 int eap_eke_dh_init(u8 group, u8 *ret_priv, u8 *ret_pub)
 {
 	int generator;
@@ -201,6 +224,7 @@ int eap_eke_dh_init(u8 group, u8 *ret_priv, u8 *ret_pub)
 
 	return 0;
 }
+#endif
 
 
 static int eap_eke_prf(u8 prf, const u8 *key, size_t key_len, const u8 *data,
@@ -397,6 +421,51 @@ int eap_eke_dhcomp(struct eap_eke_session *sess, const u8 *key, const u8 *dhpub,
 }
 
 
+#ifdef CRYPTO_ABSTRACT_API
+int eap_eke_shared_secret(struct eap_eke_session *sess, const u8 *key,
+			  const u8 *dhpriv, const u8 *peer_dhcomp)
+{
+	u8 zeros[EAP_EKE_MAX_HASH_LEN];
+	u8 peer_pub[EAP_EKE_MAX_DH_LEN];
+	u8 modexp[EAP_EKE_MAX_DH_LEN];
+	size_t len;
+	const struct dh_group *dh;
+
+	dh = eap_eke_dh_group(sess->dhgroup);
+	if (sess->encr != EAP_EKE_ENCR_AES128_CBC || !dh)
+		return -1;
+
+	/* Decrypt peer DHComponent */
+	os_memcpy(peer_pub, peer_dhcomp + AES_BLOCK_SIZE, dh->prime_len);
+	if (aes_128_cbc_decrypt(key, peer_dhcomp, peer_pub, dh->prime_len) < 0) {
+		wpa_printf(MSG_INFO, "EAP-EKE: Failed to decrypt DHComponent");
+		return -1;
+	}
+	wpa_hexdump_key(MSG_DEBUG, "EAP-EKE: Decrypted peer DH pubkey",
+			peer_pub, dh->prime_len);
+
+	/* SharedSecret = prf(0+, g ^ (x_s * x_p) (mod p)) */
+	len = dh->prime_len;
+        if (crypto_dh_derive_secret(*dh->generator, dh->prime, dh->prime_len,
+                                    dhpriv, dh->prime_len, peer_pub,
+                                    dh->prime_len, modexp, &len) < 0)
+		return -1;
+	if (len < dh->prime_len) {
+		size_t pad = dh->prime_len - len;
+		os_memmove(modexp + pad, modexp, len);
+		os_memset(modexp, 0, pad);
+	}
+
+	os_memset(zeros, 0, sess->auth_len);
+	if (eap_eke_prf(sess->prf, zeros, sess->auth_len, modexp, dh->prime_len,
+			NULL, 0, sess->shared_secret) < 0)
+		return -1;
+	wpa_hexdump_key(MSG_DEBUG, "EAP-EKE: SharedSecret",
+			sess->shared_secret, sess->auth_len);
+
+	return 0;
+}
+#else
 int eap_eke_shared_secret(struct eap_eke_session *sess, const u8 *key,
 			  const u8 *dhpriv, const u8 *peer_dhcomp)
 {
@@ -439,6 +508,7 @@ int eap_eke_shared_secret(struct eap_eke_session *sess, const u8 *key,
 
 	return 0;
 }
+#endif
 
 
 int eap_eke_derive_ke_ki(struct eap_eke_session *sess,

@@ -942,6 +942,7 @@ endif
 endif
 
 ifdef NEED_DES
+CFLAGS += -DCONFIG_DES
 ifdef CONFIG_INTERNAL_DES
 OBJS += ../src/crypto/des-internal.o
 endif
@@ -983,7 +984,9 @@ ifdef NEED_SHA384
 CFLAGS += -DCONFIG_SHA384
 ifneq ($(CONFIG_TLS), openssl)
 ifneq ($(CONFIG_TLS), linux)
+ifneq ($(CONFIG_TLS), wolfssl)
 OBJS += ../src/crypto/sha384.o
+endif
 endif
 endif
 OBJS += ../src/crypto/sha384-prf.o

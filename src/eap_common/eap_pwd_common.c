@@ -181,8 +181,11 @@ int compute_password_element(EAP_PWD_group *grp, u16 num,
 		}
 
 		if (crypto_bignum_cmp(x_candidate,
-				      crypto_ec_get_prime(grp->group)) >= 0)
+				      crypto_ec_get_prime(grp->group)) >= 0) {
+                        crypto_bignum_deinit(x_candidate, 1);
+                        crypto_bignum_deinit(rnd, 1);
 			continue;
+                }
 
 		wpa_hexdump(MSG_DEBUG, "EAP-pwd: x_candidate",
 			    prfbuf, primebytelen);
@@ -198,8 +201,12 @@ int compute_password_element(EAP_PWD_group *grp, u16 num,
 		 * don't have a point
 		 */
 		if (crypto_ec_point_solve_y_coord(grp->group, grp->pwe,
-						  x_candidate, is_odd) != 0)
+						  x_candidate, is_odd) != 0) {
+                        wpa_printf(MSG_INFO, "EAP-pwd: Could not solve for y");
+                        crypto_bignum_deinit(x_candidate, 1);
+                        crypto_bignum_deinit(rnd, 1);
 			continue;
+                }
 		/*
 		 * If there's a solution to the equation then the point must be
 		 * on the curve so why check again explicitly? OpenSSL code
@@ -208,6 +215,8 @@ int compute_password_element(EAP_PWD_group *grp, u16 num,
 		 */
 		if (!crypto_ec_point_is_on_curve(grp->group, grp->pwe)) {
 			wpa_printf(MSG_INFO, "EAP-pwd: point is not on curve");
+                        crypto_bignum_deinit(x_candidate, 1);
+                        crypto_bignum_deinit(rnd, 1);
 			continue;
 		}
 
@@ -217,12 +226,16 @@ int compute_password_element(EAP_PWD_group *grp, u16 num,
 						cofactor, grp->pwe) != 0) {
 				wpa_printf(MSG_INFO, "EAP-pwd: cannot "
 					   "multiply generator by order");
+                                crypto_bignum_deinit(x_candidate, 1);
+                                crypto_bignum_deinit(rnd, 1);
 				continue;
 			}
 			if (crypto_ec_point_is_at_infinity(grp->group,
 							   grp->pwe)) {
 				wpa_printf(MSG_INFO, "EAP-pwd: point is at "
 					   "infinity");
+                                crypto_bignum_deinit(x_candidate, 1);
+                                crypto_bignum_deinit(rnd, 1);
 				continue;
 			}
 		}

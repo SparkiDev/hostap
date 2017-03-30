@@ -246,7 +246,7 @@ void* tls_init(const struct tls_config *conf)
         wolfSSL_CTX_set_timeout(sslCtx, conf->tls_session_lifetime);
         wolfSSL_CTX_sess_set_remove_cb(sslCtx, remove_session_cb);
     } else {
-        wolfSSL_CTX_set_session_cache_mode(sslCtx, SSL_SESS_CACHE_OFF);
+        wolfSSL_CTX_set_session_cache_mode(sslCtx, SSL_SESS_CACHE_CLIENT);
     }
 
     if (conf && conf->openssl_ciphers)
@@ -271,6 +271,7 @@ void tls_deinit(void *ssl_ctx)
 
     if (context != tls_global)
         os_free(context);
+
     wolfSSL_CTX_free((WOLFSSL_CTX*)ssl_ctx);
 
     tlsRefCount--;
@@ -324,7 +325,8 @@ struct tls_connection* tls_connection_init(void *tls_ctx)
      * ID in EAP method in EAP methodss.
      */
     wolfSSL_KeepArrays(conn->ssl);
-    wolfSSL_KeepResources(conn->ssl);
+    wolfSSL_KeepHandshakeResources(conn->ssl);
+    wolfSSL_UseClientSuites(conn->ssl);
 
     return conn;
 }
@@ -357,6 +359,8 @@ int tls_connection_established(void *tls_ctx, struct tls_connection *conn)
 
 int tls_connection_shutdown(void *tls_ctx, struct tls_connection *conn)
 {
+    WOLFSSL_SESSION* session;
+
     if (conn == NULL)
         return -1;
 
@@ -365,7 +369,13 @@ int tls_connection_shutdown(void *tls_ctx, struct tls_connection *conn)
     /* Set quiet as OpenSSL does */
     wolfSSL_set_quiet_shutdown(conn->ssl, 1);
     wolfSSL_shutdown(conn->ssl);
-    return wolfSSL_clear(conn->ssl) == 1 ? 0 : -1;
+
+    session = wolfSSL_get_session(conn->ssl);
+    if (wolfSSL_clear(conn->ssl) != 1)
+        return -1;
+    wolfSSL_set_session(conn->ssl, session);
+
+    return 0;
 }
 
 
@@ -927,8 +937,10 @@ static int tls_verify_cb(int preverify_ok, WOLFSSL_X509_STORE_CTX *x509_ctx)
         const char *err_str;
 
         err_cert = wolfSSL_X509_STORE_CTX_get_current_cert(x509_ctx);
-        if (!err_cert)
+        if (err_cert == NULL) {
+                wpa_printf(MSG_DEBUG, "wolfSSL: No Cert\n");
                 return 0;
+        }
 
         err = wolfSSL_X509_STORE_CTX_get_error(x509_ctx);
         depth = wolfSSL_X509_STORE_CTX_get_error_depth(x509_ctx);
@@ -938,8 +950,10 @@ static int tls_verify_cb(int preverify_ok, WOLFSSL_X509_STORE_CTX *x509_ctx)
                                   sizeof(buf));
 
         conn = wolfSSL_get_ex_data(ssl, 0);
-        if (conn == NULL)
+        if (conn == NULL) {
+                wpa_printf(MSG_DEBUG, "wolfSSL: No ex_data\n");
                 return 0;
+        }
 
         if (depth == 0)
                 conn->peer_cert = err_cert;
@@ -1062,7 +1076,7 @@ static int tls_verify_cb(int preverify_ok, WOLFSSL_X509_STORE_CTX *x509_ctx)
                                        TLS_FAIL_SERVER_CHAIN_PROBE);
         }
 
-#ifdef OPENSSL_IS_BORINGSSL
+#ifdef HAVE_OCSP_OPENSSL
         if (depth == 0 && (conn->flags & TLS_CONN_REQUEST_OCSP) &&
             preverify_ok) {
                 enum ocsp_result res;
@@ -1086,7 +1100,7 @@ static int tls_verify_cb(int preverify_ok, WOLFSSL_X509_STORE_CTX *x509_ctx)
                                                TLS_FAIL_UNSPECIFIED);
                 }
         }
-#endif /* OPENSSL_IS_BORINGSSL */
+#endif /* HAVE_OCSP */
         if (depth == 0 && preverify_ok && context->event_cb != NULL)
                 context->event_cb(context->cb_ctx,
                                   TLS_CERT_CHAIN_SUCCESS, NULL);
@@ -1540,10 +1554,12 @@ static struct wpabuf* wolfssl_handshake(struct tls_connection *conn,
 
     /* Initiate TLS handshake or continue the existing handshake */
     if (server) {
+            wolfSSL_set_accept_state(conn->ssl);
             res = wolfSSL_accept(conn->ssl);
             wpa_printf(MSG_DEBUG, "SSL: wolfSSL_accept: %d", res);
     }
     else {
+            wolfSSL_set_connect_state(conn->ssl);
             res = wolfSSL_connect(conn->ssl);
             wpa_printf(MSG_DEBUG, "SSL: wolfSSL_connect: %d", res);
     }
@@ -1901,7 +1917,6 @@ int tls_connection_export_key(void *tls_ctx, struct tls_connection *conn,
 int tls_connection_get_eap_fast_key(void *tls_ctx, struct tls_connection *conn,
                                     u8 *out, size_t out_len)
 {
-#ifdef WOLFSSL_NEED_EAP_FAST_PRF
     int ret;
 
     if (conn == NULL || conn->ssl == NULL)
@@ -1911,9 +1926,6 @@ int tls_connection_get_eap_fast_key(void *tls_ctx, struct tls_connection *conn,
     if (ret != 0)
         return -1;
     return 0;
-#else
-    return -1;
-#endif
 }
 
 #if defined(EAP_FAST) || defined(EAP_FAST_DYNAMIC) || defined(EAP_SERVER_FAST)

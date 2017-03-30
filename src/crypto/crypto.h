@@ -417,6 +417,13 @@ int __must_check crypto_public_key_decrypt_pkcs1(
 	struct crypto_public_key *key, const u8 *crypt, size_t crypt_len,
 	u8 *plain, size_t *plain_len);
 
+int crypto_dh_init(u8 generator, const u8 *prime, size_t prime_len, u8 *privkey,
+                   u8 *pubkey);
+int crypto_dh_derive_secret(u8 generator, const u8 *prime, size_t prime_len,
+                            const u8 *privkey, size_t privkey_len,
+                            const u8 *pubkey, size_t pubkey_len,
+                            u8 *secret, size_t *len);
+
 /**
  * crypto_global_init - Initialize crypto wrapper
  *
