@@ -310,9 +310,15 @@ struct eap_sm {
 	Boolean rxResp /* LEAP only */;
 	Boolean leap_done;
 	Boolean peap_done;
+#ifndef CONFIG_FIPS
 	u8 req_md5[16]; /* MD5() of the current EAP packet */
 	u8 last_md5[16]; /* MD5() of the previously received EAP packet; used
 			  * in duplicate request detection. */
+#else
+	u8 req_sha[20]; /* SHA() of the current EAP packet */
+	u8 last_sha[20]; /* SHA() of the previously received EAP packet; used
+			  * in duplicate request detection. */
+#endif
 
 	void *msg_ctx;
 	void *scard_ctx;

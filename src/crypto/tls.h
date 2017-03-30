@@ -318,6 +318,24 @@ int __must_check  tls_connection_prf(void *tls_ctx,
 				     int server_random_first,
 				     u8 *out, size_t out_len);
 
+
+/**
+ * tls_connection_get_eap_fast_key - Derive key material for EAP-FAST
+ * @tls_ctx: TLS context data from tls_init()
+ * @conn: Connection context data from tls_connection_init()
+ * @out: Buffer for output data from TLS-PRF
+ * @out_len: Length of the output buffer
+ * Returns: 0 on success, -1 on failure
+ *
+ * Exports key material after the normal TLS key block for use with
+ * EAP-FAST. Most callers will want tls_connection_export_key(), but EAP-FAST
+ * uses a different legacy mechanism.
+ */
+int __must_check tls_connection_get_eap_fast_key(void *tls_ctx,
+						 struct tls_connection *conn,
+						 u8 *out, size_t out_len);
+
+
 /**
  * tls_connection_handshake - Process TLS handshake (client side)
  * @tls_ctx: TLS context data from tls_init()

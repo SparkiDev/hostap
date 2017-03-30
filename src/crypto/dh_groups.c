@@ -546,6 +546,43 @@ const struct dh_group * dh_groups_get(int id)
  * @priv: Pointer for returning Diffie-Hellman private key
  * Returns: Diffie-Hellman public value
  */
+#ifdef CRYPTO_ABSTRACT_API
+struct wpabuf * dh_init(const struct dh_group *dh, struct wpabuf **priv)
+{
+	struct wpabuf *pv;
+	size_t pv_len;
+
+	if (dh == NULL)
+		return NULL;
+
+	wpabuf_free(*priv);
+	*priv = wpabuf_alloc(dh->prime_len);
+	if (*priv == NULL)
+		return NULL;
+
+	pv_len = dh->prime_len;
+	pv = wpabuf_alloc(pv_len);
+	if (pv == NULL) {
+		wpabuf_free(*priv);
+		*priv = NULL;
+		return NULL;
+	}
+	if (crypto_dh_init(*dh->generator, dh->prime, dh->prime_len,
+			   wpabuf_mhead(*priv), wpabuf_mhead(pv)) < 0) {
+		wpabuf_free(pv);
+		wpa_printf(MSG_INFO, "DH: crypto_mod_exp failed");
+		wpabuf_free(*priv);
+		*priv = NULL;
+		return NULL;
+	}
+	wpabuf_put(*priv, dh->prime_len);
+	wpabuf_put(pv, dh->prime_len);
+	wpa_hexdump_buf_key(MSG_DEBUG, "DH: private value", *priv);
+	wpa_hexdump_buf(MSG_DEBUG, "DH: public value", pv);
+
+	return pv;
+}
+#else
 struct wpabuf * dh_init(const struct dh_group *dh, struct wpabuf **priv)
 {
 	struct wpabuf *pv;
@@ -589,6 +626,7 @@ struct wpabuf * dh_init(const struct dh_group *dh, struct wpabuf **priv)
 
 	return pv;
 }
+#endif
 
 
 /**
@@ -598,6 +636,37 @@ struct wpabuf * dh_init(const struct dh_group *dh, struct wpabuf **priv)
  * @dh: Selected Diffie-Hellman group
  * Returns: Diffie-Hellman shared key
  */
+#ifdef CRYPTO_ABSTRACT_API
+struct wpabuf * dh_derive_shared(const struct wpabuf *peer_public,
+				 const struct wpabuf *own_private,
+				 const struct dh_group *dh)
+{
+	struct wpabuf *shared;
+	size_t shared_len;
+
+	if (dh == NULL || peer_public == NULL || own_private == NULL)
+		return NULL;
+
+	shared_len = dh->prime_len;
+	shared = wpabuf_alloc(shared_len);
+	if (shared == NULL)
+		return NULL;
+	if (crypto_dh_derive_secret(*dh->generator, dh->prime, dh->prime_len,
+				    wpabuf_head(own_private),
+				    wpabuf_len(own_private),
+				    wpabuf_head(peer_public),
+				    wpabuf_len(peer_public),
+				    wpabuf_mhead(shared), &shared_len) < 0) {
+		wpabuf_free(shared);
+		wpa_printf(MSG_INFO, "DH: crypto_dh_derive_secret failed");
+		return NULL;
+	}
+	wpabuf_put(shared, shared_len);
+	wpa_hexdump_buf_key(MSG_DEBUG, "DH: shared key", shared);
+
+	return shared;
+}
+#else
 struct wpabuf * dh_derive_shared(const struct wpabuf *peer_public,
 				 const struct wpabuf *own_private,
 				 const struct dh_group *dh)
@@ -625,3 +694,4 @@ struct wpabuf * dh_derive_shared(const struct wpabuf *peer_public,
 
 	return shared;
 }
+#endif

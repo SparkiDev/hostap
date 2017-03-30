@@ -57,7 +57,11 @@ install: $(addprefix $(DESTDIR)$(BINDIR)/,$(BINALL))
 
 ifdef CONFIG_FIPS
 CONFIG_NO_RANDOM_POOL=
+ifeq ($(CONFIG_TLS), wolfssl)
+CONFIG_WOLFSSL_CMAC=y
+else
 CONFIG_OPENSSL_CMAC=y
+endif
 endif
 
 OBJS = config.o
@@ -351,9 +355,11 @@ CFLAGS += -DEAP_TTLS
 OBJS += ../src/eap_peer/eap_ttls.o
 OBJS_h += ../src/eap_server/eap_server_ttls.o
 endif
-MS_FUNCS=y
 TLS_FUNCS=y
+ifndef CONFIG_FIPS
+MS_FUNCS=y
 CHAP=y
+endif
 CONFIG_IEEE8021X_EAPOL=y
 endif
 
@@ -559,6 +565,9 @@ endif
 
 ifdef CONFIG_EAP_PWD
 CFLAGS += -DEAP_PWD
+ifeq ($(CONFIG_TLS), wolfssl)
+CFLAGS += -DCONFIG_ECC
+endif
 OBJS += ../src/eap_peer/eap_pwd.o ../src/eap_common/eap_pwd_common.o
 OBJS_h += ../src/eap_server/eap_pwd.o
 CONFIG_IEEE8021X_EAPOL=y
@@ -877,6 +886,22 @@ CFLAGS += -DCONFIG_TLSV12
 NEED_SHA256=y
 endif
 
+ifeq ($(CONFIG_TLS), wolfssl)
+CONFIG_WOLFSSL_CMAC=y
+CFLAGS += -DCRYPTO_ABSTRACT_API
+ifdef TLS_FUNCS
+CFLAGS += -DWOLFSSL_DER_LOAD -I/usr/local/include/wolfssl
+OBJS += ../src/crypto/tls_wolfssl.o
+endif
+OBJS += ../src/crypto/crypto_wolfssl.o
+OBJS_p += ../src/crypto/crypto_wolfssl.o
+ifdef NEED_FIPS186_2_PRF
+OBJS += ../src/crypto/fips_prf_wolfssl.o
+endif
+LIBS += -lwolfssl -lm
+LIBS_p += -lwolfssl -lm
+endif
+
 ifeq ($(CONFIG_TLS), openssl)
 ifdef TLS_FUNCS
 CFLAGS += -DEAP_TLS_OPENSSL
@@ -1060,7 +1085,13 @@ ifdef CONFIG_INTERNAL_AES
 AESOBJS += ../src/crypto/aes-internal.o ../src/crypto/aes-internal-dec.o
 endif
 
+ifeq ($(CONFIG_TLS), wolfssl)
+ifdef CONFIG_FIPS
 AESOBJS += ../src/crypto/aes-unwrap.o
+endif
+else
+AESOBJS += ../src/crypto/aes-unwrap.o
+endif
 ifdef NEED_AES_EAX
 AESOBJS += ../src/crypto/aes-eax.o
 NEED_AES_CTR=y
@@ -1076,16 +1107,28 @@ NEED_AES_ENC=y
 ifdef CONFIG_OPENSSL_CMAC
 CFLAGS += -DCONFIG_OPENSSL_CMAC
 else
+ifdef CONFIG_WOLFSSL_CMAC
+CFLAGS += -DCONFIG_WOLFSSL_CMAC
+else
 AESOBJS += ../src/crypto/aes-omac1.o
+endif
 endif
 endif
 ifdef NEED_AES_WRAP
 NEED_AES_ENC=y
+ifeq ($(CONFIG_TLS), wolfssl)
+ifdef CONFIG_FIPS
 AESOBJS += ../src/crypto/aes-wrap.o
+endif
+else
+AESOBJS += ../src/crypto/aes-wrap.o
+endif
 endif
 ifdef NEED_AES_CBC
 NEED_AES_ENC=y
+ifneq ($(CONFIG_TLS), wolfssl)
 AESOBJS += ../src/crypto/aes-cbc.o
+endif
 endif
 ifdef NEED_AES_ENC
 ifdef CONFIG_INTERNAL_AES
@@ -1098,7 +1141,9 @@ endif
 
 ifdef NEED_SHA1
 ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), wolfssl)
 SHA1OBJS += ../src/crypto/sha1.o
+endif
 endif
 SHA1OBJS += ../src/crypto/sha1-prf.o
 ifdef CONFIG_INTERNAL_SHA1
@@ -1111,7 +1156,9 @@ ifdef CONFIG_NO_WPA_PASSPHRASE
 CFLAGS += -DCONFIG_NO_PBKDF2
 else
 ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), wolfssl)
 SHA1OBJS += ../src/crypto/sha1-pbkdf2.o
+endif
 endif
 endif
 ifdef NEED_T_PRF
@@ -1123,7 +1170,9 @@ endif
 endif
 
 ifndef CONFIG_FIPS
+ifneq ($(CONFIG_TLS), wolfssl)
 MD5OBJS += ../src/crypto/md5.o
+endif
 endif
 ifdef NEED_MD5
 ifdef CONFIG_INTERNAL_MD5
@@ -1141,6 +1190,9 @@ endif
 
 DESOBJS = # none needed when not internal
 ifdef NEED_DES
+ifndef CONFIG_FIPS
+CFLAGS += -DCONFIG_DES
+endif
 ifdef CONFIG_INTERNAL_DES
 DESOBJS += ../src/crypto/des-internal.o
 endif
@@ -1156,7 +1208,9 @@ SHA256OBJS = # none by default
 ifdef NEED_SHA256
 CFLAGS += -DCONFIG_SHA256
 ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), wolfssl)
 SHA256OBJS += ../src/crypto/sha256.o
+endif
 endif
 SHA256OBJS += ../src/crypto/sha256-prf.o
 ifdef CONFIG_INTERNAL_SHA256
@@ -1340,7 +1394,9 @@ endif
 ifdef CONFIG_FIPS
 CFLAGS += -DCONFIG_FIPS
 ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), wolfssl)
 $(error CONFIG_FIPS=y requires CONFIG_TLS=openssl)
+endif
 endif
 endif
 
@@ -1445,6 +1501,9 @@ OBJS_priv += $(SHA1OBJS)
 OBJS_priv += $(MD5OBJS)
 ifeq ($(CONFIG_TLS), openssl)
 OBJS_priv += ../src/crypto/crypto_openssl.o
+endif
+ifeq ($(CONFIG_TLS), wolfssl)
+OBJS_priv += ../src/crypto/crypto_wolfssl.o
 endif
 ifeq ($(CONFIG_TLS), gnutls)
 OBJS_priv += ../src/crypto/crypto_gnutls.o

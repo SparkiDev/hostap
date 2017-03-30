@@ -417,7 +417,11 @@ SM_STATE(EAP, SEND_RESPONSE)
 	wpabuf_free(sm->lastRespData);
 	if (sm->eapRespData) {
 		if (sm->workaround)
+#ifndef CONFIG_FIPS
 			os_memcpy(sm->last_md5, sm->req_md5, 16);
+#else
+			os_memcpy(sm->last_sha, sm->req_sha, 20);
+#endif
 		sm->lastId = sm->reqId;
 		sm->lastRespData = wpabuf_dup(sm->eapRespData);
 		eapol_set_bool(sm, EAPOL_eapResp, TRUE);
@@ -619,8 +623,13 @@ static int eap_peer_req_is_duplicate(struct eap_sm *sm)
 	int duplicate;
 
 	duplicate = (sm->reqId == sm->lastId) && sm->rxReq;
+#ifndef CONFIG_FIPS
 	if (sm->workaround && duplicate &&
 	    os_memcmp(sm->req_md5, sm->last_md5, 16) != 0) {
+#else
+	if (sm->workaround && duplicate &&
+	    os_memcmp(sm->req_sha, sm->last_sha, 20) != 0) {
+#endif
 		/*
 		 * RFC 4137 uses (reqId == lastId) as the only verification for
 		 * duplicate EAP requests. However, this misses cases where the
@@ -1222,7 +1231,11 @@ static void eap_sm_parseEapReq(struct eap_sm *sm, const struct wpabuf *req)
 	if (sm->workaround) {
 		const u8 *addr[1];
 		addr[0] = wpabuf_head(req);
+#ifndef CONFIG_FIPS
 		md5_vector(1, addr, &plen, sm->req_md5);
+#else
+		sha1_vector(1, addr, &plen, sm->req_sha);
+#endif
 	}
 
 	switch (hdr->code) {

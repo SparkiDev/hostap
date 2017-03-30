@@ -25,7 +25,7 @@ SLIBS = ../src/utils/libutils.a
 DLIBS = ../src/crypto/libcrypto.a \
 	../src/tls/libtls.a
 
-LIBS = $(SLIBS) $(DLIBS)
+LIBS = $(DLIBS) $(SLIBS)
 LLIBS = -Wl,--start-group $(DLIBS) -Wl,--end-group $(SLIBS)
 
 ../src/utils/libutils.a:

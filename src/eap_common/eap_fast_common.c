@@ -93,6 +93,7 @@ void eap_fast_derive_master_secret(const u8 *pac_key, const u8 *server_random,
 }
 
 
+#ifndef CONFIG_FIPS
 u8 * eap_fast_derive_key(void *ssl_ctx, struct tls_connection *conn,
 			 const char *label, size_t len)
 {
@@ -140,6 +141,26 @@ fail:
 	os_free(out);
 	return NULL;
 }
+#else
+u8 * eap_fast_derive_key(void *ssl_ctx, struct tls_connection *conn,
+			 const char *label, size_t len)
+{
+	u8 *out;
+
+	(void)label;
+
+	out = os_malloc(len);
+	if (out == NULL)
+		return NULL;
+
+	if (tls_connection_get_eap_fast_key(ssl_ctx, conn, out, len)) {
+		os_free(out);
+		return NULL;
+	}
+
+	return out;
+}
+#endif
 
 
 void eap_fast_derive_eap_msk(const u8 *simck, u8 *msk)

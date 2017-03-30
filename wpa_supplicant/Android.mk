@@ -62,7 +62,9 @@ INCLUDES += $(LOCAL_PATH)/src/rsn_supp
 INCLUDES += $(LOCAL_PATH)/src/tls
 INCLUDES += $(LOCAL_PATH)/src/utils
 INCLUDES += $(LOCAL_PATH)/src/wps
+ifeq ($(CONFIG_TLS), openssl)
 INCLUDES += external/openssl/include
+endif
 INCLUDES += frameworks/base/cmds/keystore
 INCLUDES += system/security/keystore
 ifdef CONFIG_DRIVER_NL80211
@@ -71,7 +73,11 @@ endif
 
 ifdef CONFIG_FIPS
 CONFIG_NO_RANDOM_POOL=
+ifeq ($(CONFIG_TLS), wolfssl)
+CONFIG_WOLFSSL_CMAC=y
+else
 CONFIG_OPENSSL_CMAC=y
+endif
 endif
 
 OBJS = config.c
@@ -343,9 +349,11 @@ L_CFLAGS += -DEAP_TTLS
 OBJS += src/eap_peer/eap_ttls.c
 OBJS_h += src/eap_server/eap_server_ttls.c
 endif
-MS_FUNCS=y
 TLS_FUNCS=y
+ifndef CONFIG_FIPS
+MS_FUNCS=y
 CHAP=y
+endif
 CONFIG_IEEE8021X_EAPOL=y
 endif
 
@@ -551,6 +559,9 @@ endif
 
 ifdef CONFIG_EAP_PWD
 L_CFLAGS += -DEAP_PWD
+ifeq ($(CONFIG_TLS), wolfssl)
+CFLAGS += -DCONFIG_ECC
+endif
 OBJS += src/eap_peer/eap_pwd.c src/eap_common/eap_pwd_common.c
 OBJS_h += src/eap_server/eap_pwd.c
 CONFIG_IEEE8021X_EAPOL=y
@@ -861,6 +872,22 @@ ifdef CONFIG_TLSV11
 L_CFLAGS += -DCONFIG_TLSV11
 endif
 
+ifeq ($(CONFIG_TLS), wolfssl)
+CONFIG_WOLFSSL_CMAC=y
+L_CFLAGS += -DCRYPTO_ABSTRACT_API
+ifdef TLS_FUNCS
+L_CFLAGS += -DWOLFSSL_DER_LOAD -I/usr/local/include/wolfssl
+OBJS += src/crypto/tls_wolfssl.c
+endif
+OBJS += src/crypto/crypto_wolfssl.c
+OBJS_p += src/crypto/crypto_wolfssl.c
+ifdef NEED_FIPS186_2_PRF
+OBJS += src/crypto/fips_prf_wolfssl.c
+endif
+LIBS += -lwolfssl -lm
+LIBS_p += -lwolfssl -lm
+endif
+
 ifeq ($(CONFIG_TLS), openssl)
 ifdef TLS_FUNCS
 L_CFLAGS += -DEAP_TLS_OPENSSL
@@ -1037,7 +1064,13 @@ ifdef CONFIG_INTERNAL_AES
 AESOBJS += src/crypto/aes-internal.c src/crypto/aes-internal-dec.c
 endif
 
+ifeq ($(CONFIG_TLS), wolfssl)
+ifdef CONFIG_FIPS
 AESOBJS += src/crypto/aes-unwrap.c
+endif
+else
+AESOBJS += src/crypto/aes-unwrap.c
+endif
 ifdef NEED_AES_EAX
 AESOBJS += src/crypto/aes-eax.c
 NEED_AES_CTR=y
@@ -1053,16 +1086,28 @@ NEED_AES_ENC=y
 ifdef CONFIG_OPENSSL_CMAC
 CFLAGS += -DCONFIG_OPENSSL_CMAC
 else
+ifdef CONFIG_WOLFSSL_CMAC
+CFLAGS += -DCONFIG_WOLFSSL_CMAC
+else
 AESOBJS += src/crypto/aes-omac1.c
+endif
 endif
 endif
 ifdef NEED_AES_WRAP
 NEED_AES_ENC=y
+ifeq ($(CONFIG_TLS), wolfssl)
+ifdef CONFIG_FIPS
 AESOBJS += src/crypto/aes-wrap.c
+endif
+else
+AESOBJS += src/crypto/aes-wrap.c
+endif
 endif
 ifdef NEED_AES_CBC
 NEED_AES_ENC=y
+ifneq ($(CONFIG_TLS), wolfssl)
 AESOBJS += src/crypto/aes-cbc.c
+endif
 endif
 ifdef NEED_AES_ENC
 ifdef CONFIG_INTERNAL_AES
@@ -1076,7 +1121,9 @@ endif
 SHA1OBJS =
 ifdef NEED_SHA1
 ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), wolfssl)
 SHA1OBJS += src/crypto/sha1.c
+endif
 endif
 SHA1OBJS += src/crypto/sha1-prf.c
 ifdef CONFIG_INTERNAL_SHA1
@@ -1089,7 +1136,9 @@ ifdef CONFIG_NO_WPA_PASSPHRASE
 L_CFLAGS += -DCONFIG_NO_PBKDF2
 else
 ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), wolfssl)
 SHA1OBJS += src/crypto/sha1-pbkdf2.c
+endif
 endif
 endif
 ifdef NEED_T_PRF
@@ -1100,7 +1149,9 @@ SHA1OBJS += src/crypto/sha1-tlsprf.c
 endif
 endif
 
+ifneq ($(CONFIG_TLS), wolfssl)
 MD5OBJS = src/crypto/md5.c
+endif
 ifdef NEED_MD5
 ifdef CONFIG_INTERNAL_MD5
 MD5OBJS += src/crypto/md5-internal.c
@@ -1117,6 +1168,9 @@ endif
 
 DESOBJS = # none needed when not internal
 ifdef NEED_DES
+ifndef CONFIG_FIPS
+CFLAGS += -DCONFIG_DES
+endif
 ifdef CONFIG_INTERNAL_DES
 DESOBJS += src/crypto/des-internal.c
 endif
@@ -1132,7 +1186,9 @@ SHA256OBJS = # none by default
 ifdef NEED_SHA256
 L_CFLAGS += -DCONFIG_SHA256
 ifneq ($(CONFIG_TLS), openssl)
+ifneq ($(CONFIG_TLS), wolfssl)
 SHA256OBJS += src/crypto/sha256.c
+endif
 endif
 SHA256OBJS += src/crypto/sha256-prf.c
 ifdef CONFIG_INTERNAL_SHA256
@@ -1408,6 +1464,9 @@ OBJS_priv += $(MD5OBJS)
 ifeq ($(CONFIG_TLS), openssl)
 OBJS_priv += src/crypto/crypto_openssl.c
 endif
+ifeq ($(CONFIG_TLS), wolfssl)
+OBJS_priv += src/crypto/crypto_wolfssl.c
+endif
 ifeq ($(CONFIG_TLS), gnutls)
 OBJS_priv += src/crypto/crypto_gnutls.c
 endif
@@ -1468,6 +1527,9 @@ endif
 LOCAL_SHARED_LIBRARIES := libc libcutils
 ifeq ($(CONFIG_TLS), openssl)
 LOCAL_SHARED_LIBRARIES += libcrypto libssl
+endif
+ifeq ($(CONFIG_TLS), wolfssl)
+LOCAL_SHARED_LIBRARIES += libwolfssl
 endif
 ifdef CONFIG_DRIVER_NL80211
 LOCAL_STATIC_LIBRARIES += libnl_2

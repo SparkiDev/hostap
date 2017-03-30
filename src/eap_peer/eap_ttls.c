@@ -226,11 +226,13 @@ static int eap_ttls_v0_derive_key(struct eap_sm *sm,
 }
 
 
+#ifndef CONFIG_FIPS
 static u8 * eap_ttls_implicit_challenge(struct eap_sm *sm,
 					struct eap_ttls_data *data, size_t len)
 {
 	return eap_peer_tls_derive_key(sm, &data->ssl, "ttls challenge", len);
 }
+#endif /* !CONFIG_FIPS */
 
 
 static void eap_ttls_phase2_select_eap_method(struct eap_ttls_data *data,
@@ -401,6 +403,10 @@ static int eap_ttls_phase2_request_mschapv2(struct eap_sm *sm,
 					    struct eap_method_ret *ret,
 					    struct wpabuf **resp)
 {
+#ifdef CONFIG_FIPS
+	wpa_printf(MSG_ERROR, "EAP-TTLS: MSCHAPV2 not supported in FIPS build");
+	return -1;
+#else /* CONFIG_FIPS */
 #ifdef EAP_MSCHAPv2
 	struct wpabuf *msg;
 	u8 *buf, *pos, *challenge, *peer_challenge;
@@ -493,6 +499,7 @@ static int eap_ttls_phase2_request_mschapv2(struct eap_sm *sm,
 	wpa_printf(MSG_ERROR, "EAP-TTLS: MSCHAPv2 not included in the build");
 	return -1;
 #endif /* EAP_MSCHAPv2 */
+#endif /* CONFIG_FIPS */
 }
 
 
@@ -501,6 +508,10 @@ static int eap_ttls_phase2_request_mschap(struct eap_sm *sm,
 					  struct eap_method_ret *ret,
 					  struct wpabuf **resp)
 {
+#ifdef CONFIG_FIPS
+	wpa_printf(MSG_ERROR, "EAP-TTLS: MSCHAP not supported in FIPS build");
+	return -1;
+#else /* CONFIG_FIPS */
 	struct wpabuf *msg;
 	u8 *buf, *pos, *challenge;
 	const u8 *identity, *password;
@@ -575,6 +586,7 @@ static int eap_ttls_phase2_request_mschap(struct eap_sm *sm,
 	ret->decision = DECISION_COND_SUCC;
 
 	return 0;
+#endif /* CONFIG_FIPS */
 }
 
 
@@ -637,6 +649,10 @@ static int eap_ttls_phase2_request_chap(struct eap_sm *sm,
 					struct eap_method_ret *ret,
 					struct wpabuf **resp)
 {
+#ifdef CONFIG_FIPS
+	wpa_printf(MSG_ERROR, "EAP-TTLS: CHAP not supported in FIPS build");
+	return -1;
+#else /* CONFIG_FIPS */
 	struct wpabuf *msg;
 	u8 *buf, *pos, *challenge;
 	const u8 *identity, *password;
@@ -705,6 +721,7 @@ static int eap_ttls_phase2_request_chap(struct eap_sm *sm,
 	ret->decision = DECISION_COND_SUCC;
 
 	return 0;
+#endif /* CONFIG_FIPS */
 }
 
 

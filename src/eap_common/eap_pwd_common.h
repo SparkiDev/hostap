@@ -9,9 +9,13 @@
 #ifndef EAP_PWD_COMMON_H
 #define EAP_PWD_COMMON_H
 
+#ifdef CRYPTO_ABSTRACT_API
+#include "crypto/crypto.h"
+#else
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 #include <openssl/evp.h>
+#endif
 
 /*
  * definition of a finite cyclic group
@@ -19,10 +23,15 @@
  */
 typedef struct group_definition_ {
 	u16 group_num;
+#ifdef CRYPTO_ABSTRACT_API
+        struct crypto_ec *group;
+        struct crypto_ec_point *pwe;
+#else
 	EC_GROUP *group;
 	EC_POINT *pwe;
 	BIGNUM *order;
 	BIGNUM *prime;
+#endif
 } EAP_PWD_group;
 
 /*
@@ -58,8 +67,16 @@ struct eap_pwd_id {
 /* common routines */
 int compute_password_element(EAP_PWD_group *, u16, u8 *, int, u8 *, int, u8 *,
 			     int, u8 *);
+#ifdef CRYPTO_ABSTRACT_API
+int compute_keys(EAP_PWD_group *grp, const struct crypto_bignum *k,
+		 const struct crypto_bignum *peer_scalar,
+		 const struct crypto_bignum  *server_scalar,
+		 const u8 *confirm_peer, const u8 *confirm_server,
+		 const u32 *ciphersuite, u8 *msk, u8 *emsk);
+#else
 int compute_keys(EAP_PWD_group *, BN_CTX *, BIGNUM *, BIGNUM *, BIGNUM *,
 		 u8 *, u8 *, u32 *, u8 *, u8 *);
+#endif
 struct crypto_hash * eap_pwd_h_init(void);
 void eap_pwd_h_update(struct crypto_hash *hash, const u8 *data, size_t len);
 void eap_pwd_h_final(struct crypto_hash *hash, u8 *digest);
