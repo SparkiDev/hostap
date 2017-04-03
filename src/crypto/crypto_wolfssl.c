@@ -149,7 +149,7 @@ static int wolfssl_hmac_vector(int type, const u8 *key,
                                unsigned int mdlen)
 {
     Hmac hmac;
-    int i;
+    size_t i;
 
     (void)mdlen;
 
