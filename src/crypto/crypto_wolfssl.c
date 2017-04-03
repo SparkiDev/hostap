@@ -117,7 +117,7 @@ static int wolfssl_hmac_vector(int type, const u8 *key,
                                unsigned int mdlen)
 {
     Hmac hmac;
-    int i;
+    size_t i;
 
     (void)mdlen;
 
@@ -586,7 +586,7 @@ void crypto_cipher_deinit(struct crypto_cipher *ctx)
 }
 #endif
 
-#ifdef CONFIG_WPS_NFC
+#ifdef CONFIG_WPS
 static const unsigned char RFC3526_PRIME_1536[] = {
     0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xC9,0x0F,0xDA,0xA2,
     0x21,0x68,0xC2,0x34,0xC4,0xC6,0x62,0x8B,0x80,0xDC,0x1C,0xD1,
