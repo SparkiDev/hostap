@@ -323,18 +323,18 @@ int aes_128_cbc_decrypt(const u8 *key, const u8 *iv, u8 *data, size_t data_len)
 #ifndef CONFIG_FIPS
 #ifndef CONFIG_OPENSSL_INTERNAL_AES_WRAP
 
-int aes_wrap(const u8 *kek, size_t kek_len, int n, const u8 *plain, u8 *cipher)
+int aes_wrap(const u8 *kek, int n, const u8 *plain, u8 *cipher)
 {
-    int ret = wc_AesKeyWrap(kek, kek_len, plain, n * 8, cipher, (n + 1) * 8,
+    int ret = wc_AesKeyWrap(kek, 16, plain, n * 8, cipher, (n + 1) * 8,
                             NULL);
     return ret != (n + 1) * 8 ? -1 : 0;
 }
 
 
-int aes_unwrap(const u8 *kek, size_t kek_len, int n, const u8 *cipher,
+int aes_unwrap(const u8 *kek, int n, const u8 *cipher,
                u8 *plain)
 {
-    int ret = wc_AesKeyUnWrap(kek, kek_len, cipher, (n + 1) * 8, plain, n * 8,
+    int ret = wc_AesKeyUnWrap(kek, 16, cipher, (n + 1) * 8, plain, n * 8,
                               NULL);
     return ret != n * 8 ? -1 : 0;
 }
@@ -621,7 +621,6 @@ void * dh5_init(struct wpabuf **priv, struct wpabuf **publ)
     word32 privSz, pubSz;
 
     *priv = NULL;
-    wpabuf_free(*publ);
     *publ = NULL;
 
     dh = os_malloc(sizeof(DhKey));
